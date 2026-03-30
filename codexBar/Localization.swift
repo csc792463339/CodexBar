@@ -33,6 +33,8 @@ enum L {
     static var addAccountHint: String  { zh ? "点击下方 + 添加账号"   : "Tap + below to add an account" }
     static var refreshUsage: String    { zh ? "刷新用量"            : "Refresh Usage" }
     static var addAccount: String      { zh ? "添加账号"            : "Add Account" }
+    static var importAccounts: String  { zh ? "导入账号"            : "Import Accounts" }
+    static var exportAccounts: String  { zh ? "导出账号"            : "Export Accounts" }
     static var quit: String            { zh ? "退出"               : "Quit" }
     static var noActiveAccount: String { zh ? "当前没有激活账号"     : "No active account" }
     static var activeBadge: String     { zh ? "当前"               : "Active" }
@@ -124,6 +126,58 @@ enum L {
 
     // MARK: - Refresh
     static var refreshDone: String { zh ? "刷新完成" : "Refresh complete" }
+    static var oauthLinkCopied: String {
+        zh ? "OAuth 跳转链接已复制到剪贴板 (⌘⇧L)" : "OAuth link copied to clipboard (Cmd+Shift+L)"
+    }
+    static var oauthAccountAdded: String {
+        zh ? "账号已添加到 Codex Bar" : "Account added to Codex Bar"
+    }
+    static var clipboardWriteFailed: String {
+        zh ? "复制链接到剪贴板失败" : "Failed to copy link to clipboard"
+    }
+    static func callbackServerUnavailable(_ port: Int) -> String {
+        zh ? "本地回调服务启动失败，请检查 \(port) 端口是否被占用" : "Could not start the local callback server on port \(port)"
+    }
+    static var backupReadFailed: String {
+        zh ? "读取备份文件失败" : "Failed to read the backup file"
+    }
+    static var backupInvalidFormat: String {
+        zh ? "备份 JSON 无效或结构不受支持" : "Backup JSON is invalid or unsupported"
+    }
+    static var backupWriteFailed: String {
+        zh ? "写入备份文件失败" : "Failed to write the backup file"
+    }
+    static var noImportableAccounts: String {
+        zh ? "备份中没有可导入的新账号" : "No new accounts available to import"
+    }
+    static var exportAccountsHelp: String {
+        zh ? "导出账号到 JSON" : "Export accounts to JSON"
+    }
+    static var importAccountsHelp: String {
+        zh ? "从 JSON 导入账号" : "Import accounts from JSON"
+    }
+    static var exportBackupWarning: String {
+        zh
+            ? "导出的 JSON 包含 access_token / refresh_token / id_token，请妥善保管。"
+            : "The exported JSON contains access_token / refresh_token / id_token. Store it securely."
+    }
+    static var importBackupWarning: String {
+        zh ? "仅导入可信的账号备份 JSON 文件。" : "Only import trusted account backup JSON files."
+    }
+    static var exportBackupPrompt: String {
+        zh ? "导出" : "Export"
+    }
+    static var importBackupPrompt: String {
+        zh ? "导入" : "Import"
+    }
+    static func exportedAccounts(_ count: Int) -> String {
+        zh ? "已导出 \(count) 个账号" : "Exported \(count) accounts"
+    }
+    static func importedAccounts(_ imported: Int, _ skipped: Int) -> String {
+        zh
+            ? "已导入 \(imported) 个账号，跳过重复 \(skipped) 个"
+            : "Imported \(imported) accounts, skipped \(skipped) duplicates"
+    }
 
     // MARK: - Trust Bar
     static var autoSwitch: String    { zh ? "自动切换" : "Auto-Switch" }

@@ -1,6 +1,11 @@
 import Foundation
 import Combine
 
+struct AccountImportSummary {
+    let importedCount: Int
+    let skippedCount: Int
+}
+
 class TokenStore: ObservableObject {
     static let shared = TokenStore()
 
@@ -56,9 +61,7 @@ class TokenStore: ObservableObject {
     }
 
     func save() {
-        let pool = TokenPool(accounts: accounts)
-        guard let data = try? encoder.encode(pool) else { return }
-        try? data.write(to: poolURL, options: .atomic)
+        try? persistPool()
     }
 
     func addOrUpdate(_ account: TokenAccount) {
@@ -83,13 +86,73 @@ class TokenStore: ObservableObject {
         let authDict = buildAuthJSON(account)
         guard JSONSerialization.isValidJSONObject(authDict),
               let data = try? JSONSerialization.data(withJSONObject: authDict, options: [.prettyPrinted, .sortedKeys]) else {
-            throw TokenStoreError.encodingFailed
+            throw TokenStoreError.authEncodingFailed
         }
-        try data.write(to: authURL, options: .atomic)
-        markActiveAccount()
+        do {
+            try data.write(to: authURL, options: .atomic)
+        } catch {
+            throw TokenStoreError.authWriteFailed
+        }
+        applyActiveAccount(account.accountId)
+        try persistPool()
         objectWillChange.send()
     }
 
+    func exportAccounts(to url: URL) throws {
+        do {
+            let data = try encodedPoolData()
+            try data.write(to: url, options: .atomic)
+        } catch {
+            throw TokenStoreError.writeFailed
+        }
+    }
+
+    func importAccounts(from url: URL) throws -> AccountImportSummary {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw TokenStoreError.readFailed
+        }
+
+        let importedPool: TokenPool
+        do {
+            importedPool = try decoder.decode(TokenPool.self, from: data)
+        } catch {
+            throw TokenStoreError.invalidFormat
+        }
+
+        var seenAccountIDs = Set(accounts.map(\.accountId))
+        var importedAccounts: [TokenAccount] = []
+        var skippedCount = 0
+
+        for account in importedPool.accounts {
+            let normalized = try normalizedImportedAccount(account)
+            guard !seenAccountIDs.contains(normalized.accountId) else {
+                skippedCount += 1
+                continue
+            }
+            seenAccountIDs.insert(normalized.accountId)
+            importedAccounts.append(normalized)
+        }
+
+        guard !importedAccounts.isEmpty else {
+            throw TokenStoreError.noImportableAccounts
+        }
+
+        let previousAccounts = accounts
+        accounts.append(contentsOf: importedAccounts)
+        applyActiveAccount(currentAuthAccountID())
+
+        do {
+            try persistPool()
+        } catch {
+            accounts = previousAccounts
+            throw TokenStoreError.writeFailed
+        }
+
+        return AccountImportSummary(importedCount: importedAccounts.count, skippedCount: skippedCount)
+    }
 
     func activeAccount() -> TokenAccount? {
         accounts.first { $0.isActive }
@@ -98,15 +161,46 @@ class TokenStore: ObservableObject {
     // MARK: - Private
 
     func markActiveAccount() {
+        applyActiveAccount(currentAuthAccountID())
+        save()
+    }
+
+    private func encodedPoolData() throws -> Data {
+        try encoder.encode(TokenPool(accounts: accounts))
+    }
+
+    private func persistPool() throws {
+        let data = try encodedPoolData()
+        try data.write(to: poolURL, options: .atomic)
+    }
+
+    private func currentAuthAccountID() -> String? {
         guard let data = try? Data(contentsOf: authURL),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tokens = json["tokens"] as? [String: Any],
-              let accountId = tokens["account_id"] as? String else { return }
+              let accountId = tokens["account_id"] as? String,
+              !accountId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return accountId
+    }
 
+    private func applyActiveAccount(_ accountId: String?) {
         for idx in accounts.indices {
             accounts[idx].isActive = (accounts[idx].accountId == accountId)
         }
-        save()
+    }
+
+    private func normalizedImportedAccount(_ account: TokenAccount) throws -> TokenAccount {
+        let trimmedAccountID = account.accountId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAccountID.isEmpty else {
+            throw TokenStoreError.invalidFormat
+        }
+
+        var normalized = account
+        normalized.accountId = trimmedAccountID
+        normalized.isActive = false
+        return normalized
     }
 
     private func buildAuthJSON(_ account: TokenAccount) -> [String: Any] {
@@ -126,6 +220,25 @@ class TokenStore: ObservableObject {
 }
 
 enum TokenStoreError: LocalizedError {
-    case encodingFailed
-    var errorDescription: String? { "写入 auth.json 失败" }
+    case authEncodingFailed
+    case authWriteFailed
+    case readFailed
+    case invalidFormat
+    case writeFailed
+    case noImportableAccounts
+
+    var errorDescription: String? {
+        switch self {
+        case .authEncodingFailed, .authWriteFailed:
+            return "写入 auth.json 失败"
+        case .readFailed:
+            return L.backupReadFailed
+        case .invalidFormat:
+            return L.backupInvalidFormat
+        case .writeFailed:
+            return L.backupWriteFailed
+        case .noImportableAccounts:
+            return L.noImportableAccounts
+        }
+    }
 }

@@ -16,6 +16,30 @@ struct QuotaWindowDisplay: Identifiable {
     var remainingPercent: Double { max(0, 100 - usedPercent) }
 }
 
+struct AccountDisplaySortKey: Comparable {
+    let hasPrimaryWindow: Bool
+    let primaryRemainingPercent: Double
+    let hasSecondaryWindow: Bool
+    let secondaryRemainingPercent: Double
+    let normalizedEmail: String
+    let accountId: String
+
+    static func < (lhs: AccountDisplaySortKey, rhs: AccountDisplaySortKey) -> Bool {
+        if lhs.hasPrimaryWindow != rhs.hasPrimaryWindow { return lhs.hasPrimaryWindow }
+        if lhs.primaryRemainingPercent != rhs.primaryRemainingPercent {
+            return lhs.primaryRemainingPercent > rhs.primaryRemainingPercent
+        }
+        if lhs.hasSecondaryWindow != rhs.hasSecondaryWindow { return lhs.hasSecondaryWindow }
+        if lhs.secondaryRemainingPercent != rhs.secondaryRemainingPercent {
+            return lhs.secondaryRemainingPercent > rhs.secondaryRemainingPercent
+        }
+        if lhs.normalizedEmail != rhs.normalizedEmail {
+            return lhs.normalizedEmail < rhs.normalizedEmail
+        }
+        return lhs.accountId < rhs.accountId
+    }
+}
+
 struct TokenAccount: Codable, Identifiable {
     var id: String { accountId }
     var email: String
@@ -133,6 +157,30 @@ struct TokenAccount: Codable, Identifiable {
             windows.append(QuotaWindowDisplay(kind: .sevenDay, usedPercent: secondaryUsedPercent, resetAt: secondaryResetAt))
         }
         return windows
+    }
+
+    var primaryRemainingPercent: Double? {
+        guard hasPrimaryWindow else { return nil }
+        return max(0, 100 - primaryUsedPercent)
+    }
+
+    var secondaryRemainingPercent: Double? {
+        guard hasSecondaryWindow else { return nil }
+        return max(0, 100 - secondaryUsedPercent)
+    }
+
+    var displaySortKey: AccountDisplaySortKey {
+        AccountDisplaySortKey(
+            hasPrimaryWindow: hasPrimaryWindow,
+            primaryRemainingPercent: primaryRemainingPercent ?? 0,
+            hasSecondaryWindow: hasSecondaryWindow,
+            secondaryRemainingPercent: secondaryRemainingPercent ?? 0,
+            normalizedEmail: email.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: .autoupdatingCurrent
+            ),
+            accountId: accountId
+        )
     }
 
     var mostConstrainedRemainingPercent: Double {

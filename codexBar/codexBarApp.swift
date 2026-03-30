@@ -7,6 +7,16 @@ struct codexBarApp: App {
     @StateObject private var store = TokenStore.shared
     @StateObject private var oauth = OAuthManager.shared
 
+    init() {
+        do {
+            try GlobalHotKeyManager.shared.register {
+                OAuthManager.shared.copyAuthorizationLinkToClipboard()
+            }
+        } catch {
+            OAuthManager.shared.errorMessage = error.localizedDescription
+        }
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuBarView()

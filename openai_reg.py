@@ -18,9 +18,9 @@ from curl_cffi import requests
 # ==========================================
 
 SIGNUP_EMAIL_TEMPLATE = "x{num}@csc-csc.cc"
-SIGNUP_EMAIL_START = 9
-SIGNUP_EMAIL_END = 15
-SIGNUP_PASSWORD = "."
+SIGNUP_EMAIL_START = 51
+SIGNUP_EMAIL_END = 65
+SIGNUP_PASSWORD = "Csc5632898..."
 
 OPENAI_AUTHORIZE_CONTINUE_URL = "https://auth.openai.com/api/accounts/authorize/continue"
 OPENAI_REGISTER_URL = "https://auth.openai.com/api/accounts/user/register"
@@ -35,7 +35,7 @@ CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 DEFAULT_REDIRECT_URI = "http://localhost:1455/auth/callback"
 DEFAULT_SCOPE = "openid email profile offline_access"
 
-MAIL_CODE_API = "http://localhost:8080/api/mail/latest?inbox={mail}&type=code"
+MAIL_CODE_API = "http://csc-csc.cc:8080/api/mail/latest?inbox={mail}&type=code"
 MAIL_POLL_INTERVAL = 5
 MAIL_POLL_ROUND_TIMEOUT = 30
 MAIL_MAX_SEND_ATTEMPTS = 2
@@ -189,7 +189,7 @@ def check_network(session: requests.Session) -> bool:
     print(f"[*] 当前 IP 所在地: {loc}")
     if loc in ("CN", "HK"):
         print("[Error] 检查代理哦w - 所在地不支持")
-        return False
+        return True
     return True
 
 

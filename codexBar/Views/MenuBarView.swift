@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 import UserNotifications
+import AppKit
+import UniformTypeIdentifiers
 
 struct MenuBarView: View {
     @EnvironmentObject var store: TokenStore
@@ -50,14 +52,7 @@ struct MenuBarView: View {
     }
 
     private func displayOrder(_ lhs: TokenAccount, _ rhs: TokenAccount) -> Bool {
-        if lhs.isActive != rhs.isActive { return lhs.isActive }
-        let lhsRem = lhs.mostConstrainedRemainingPercent
-        let rhsRem = rhs.mostConstrainedRemainingPercent
-        if lhsRem != rhsRem { return lhsRem > rhsRem }
-        let lhsBest = lhs.bestAvailableRemainingPercent
-        let rhsBest = rhs.bestAvailableRemainingPercent
-        if lhsBest != rhsBest { return lhsBest > rhsBest }
-        return lhs.accountId < rhs.accountId
+        lhs.displaySortKey < rhs.displaySortKey
     }
 
     private var availableCount: Int {
@@ -134,9 +129,26 @@ struct MenuBarView: View {
                 autoSwitchIfNeeded()
             }
         }
+        .onReceive(oauth.$successMessage.compactMap { $0 }) { message in
+            showError = nil
+            showTransientSuccess(message)
+            oauth.clearSuccessMessage()
+        }
+        .onReceive(oauth.$errorMessage.compactMap { $0 }) { message in
+            showSuccess = nil
+            showError = message
+            oauth.clearErrorMessage()
+        }
         .onAppear {
             menuVisible = true
             store.markActiveAccount()
+            if let success = oauth.consumeSuccessMessage() {
+                showTransientSuccess(success)
+            }
+            if let error = oauth.consumeErrorMessage() {
+                showSuccess = nil
+                showError = error
+            }
         }
         .onDisappear { menuVisible = false }
     }
@@ -400,6 +412,19 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(GlassIconButtonStyle(prominent: true, tint: MenuBarTheme.accent))
 
+                Button(action: exportAccounts) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(GlassIconButtonStyle(tint: MenuBarTheme.info))
+                .help(L.exportAccountsHelp)
+                .disabled(store.accounts.isEmpty)
+
+                Button(action: importAccounts) {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .buttonStyle(GlassIconButtonStyle(tint: MenuBarTheme.success))
+                .help(L.importAccountsHelp)
+
                 Button(action: toggleLanguage) { Text(languageLabel) }
                     .buttonStyle(GlassPillButtonStyle())
 
@@ -514,6 +539,58 @@ struct MenuBarView: View {
         case false: L.languageOverride = nil
         }
         languageToggle.toggle()
+    }
+
+    private func exportAccounts() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.title = L.exportAccounts
+        panel.message = L.exportBackupWarning
+        panel.prompt = L.exportBackupPrompt
+        panel.nameFieldStringValue = defaultBackupFileName()
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try store.exportAccounts(to: url)
+            showError = nil
+            showTransientSuccess(L.exportedAccounts(store.accounts.count))
+        } catch {
+            showSuccess = nil
+            showError = error.localizedDescription
+        }
+    }
+
+    private func importAccounts() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.title = L.importAccounts
+        panel.message = L.importBackupWarning
+        panel.prompt = L.importBackupPrompt
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let summary = try store.importAccounts(from: url)
+            showError = nil
+            showTransientSuccess(L.importedAccounts(summary.importedCount, summary.skippedCount))
+        } catch {
+            showSuccess = nil
+            showError = error.localizedDescription
+        }
+    }
+
+    private func defaultBackupFileName() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return "codexbar-accounts-\(formatter.string(from: Date())).json"
     }
 
     private func relativeTime(_ date: Date) -> String {
