@@ -39,6 +39,7 @@ enum L {
     static var noActiveAccount: String { zh ? "当前没有激活账号"     : "No active account" }
     static var activeBadge: String     { zh ? "当前"               : "Active" }
     static var waitingForRefresh: String { zh ? "等待首次刷新"      : "Waiting for first refresh" }
+    static var toggleLanguageHelp: String { zh ? "切换界面语言" : "Toggle interface language" }
     static var switchAccount: String    { zh ? "切换账号"            : "Switch Account" }
     static var switchTitle: String     { zh ? "切换账号"            : "Switch Account" }
     static var continueRestart: String { zh ? "继续"               : "Continue" }

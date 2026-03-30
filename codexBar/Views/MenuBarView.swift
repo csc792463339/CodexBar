@@ -425,8 +425,12 @@ struct MenuBarView: View {
                 .buttonStyle(GlassIconButtonStyle(tint: MenuBarTheme.success))
                 .help(L.importAccountsHelp)
 
-                Button(action: toggleLanguage) { Text(languageLabel) }
-                    .buttonStyle(GlassPillButtonStyle())
+                Button(action: toggleLanguage) {
+                    Label(languageLabel, systemImage: "globe")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.info))
+                .help(L.toggleLanguageHelp)
 
                 Button { NSApplication.shared.terminate(nil) } label: {
                     Image(systemName: "power")
