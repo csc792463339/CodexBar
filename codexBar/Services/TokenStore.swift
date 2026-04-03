@@ -1,244 +1,325 @@
-import Foundation
 import Combine
+import Foundation
 
-struct AccountImportSummary {
-    let importedCount: Int
-    let skippedCount: Int
-}
-
-class TokenStore: ObservableObject {
+final class TokenStore: ObservableObject {
     static let shared = TokenStore()
 
+    // 对外接口：OAuth 账号视图层列表（供 WhamService、MenuBarView 使用）
     @Published var accounts: [TokenAccount] = []
+    // 对外接口：完整配置（供 MenuBarView provider 切换使用）
+    @Published private(set) var config: CodexBarConfig
 
-    private let poolURL: URL
-    private let authURL: URL
-
-    private let encoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.dateEncodingStrategy = .iso8601
-        e.outputFormatting = .prettyPrinted
-        return e
-    }()
-
-    private let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
-    }()
+    private let configStore = CodexBarConfigStore()
+    private let syncService = CodexSyncService()
 
     private init() {
-        // 用 getpwuid 取真实 home，绕过沙盒对 HOME 的重映射
-        let sandboxHome = FileManager.default.homeDirectoryForCurrentUser
-        let realHome: URL
-        if let pw = getpwuid(getuid()), let pwDir = pw.pointee.pw_dir {
-            realHome = URL(fileURLWithPath: String(cString: pwDir))
+        if let loaded = try? self.configStore.loadOrMigrate() {
+            self.config = loaded
         } else {
-            realHome = sandboxHome
+            self.config = CodexBarConfig()
         }
-        let realCodex = realHome.appendingPathComponent(".codex")
-        try? FileManager.default.createDirectory(at: realCodex, withIntermediateDirectories: true)
-
-        // token_pool.json 和 auth.json 都放在真实 ~/.codex/
-        poolURL = realCodex.appendingPathComponent("token_pool.json")
-        authURL = realCodex.appendingPathComponent("auth.json")
-
-        load()
+        self.publishState()
+        try? self.syncService.synchronize(config: self.config)
     }
 
-    func load() {
-        guard let data = try? Data(contentsOf: poolURL) else {
-            accounts = []
-            return
-        }
-        do {
-            let pool = try decoder.decode(TokenPool.self, from: data)
-            accounts = pool.accounts
-            markActiveAccount()
-        } catch {
-            accounts = []
-        }
-    }
+    // MARK: - Public: Provider 信息
 
-    func save() {
-        try? persistPool()
-    }
+    var activeProvider: CodexBarProvider? { self.config.activeProvider() }
+    var activeProviderAccount: CodexBarProviderAccount? { self.config.activeAccount() }
+    var customProviders: [CodexBarProvider] { self.config.providers.filter { $0.kind == .openAICompatible } }
+
+    // MARK: - Public: OAuth 账号操作（保持原有接口）
 
     func addOrUpdate(_ account: TokenAccount) {
-        if let idx = accounts.firstIndex(where: { $0.accountId == account.accountId }) {
-            var merged = account
-            // 保留 store 里的 isActive，防止异步刷新快照覆盖 activate() 的结果
-            merged.isActive = accounts[idx].isActive
-            accounts[idx] = merged
+        var provider = self.ensureOAuthProvider()
+        if let index = provider.accounts.firstIndex(where: { $0.openAIAccountId == account.accountId }) {
+            let existing = provider.accounts[index]
+            var updated = CodexBarProviderAccount.fromTokenAccount(account, existingID: existing.id)
+            updated.addedAt = existing.addedAt ?? Date()
+            updated.label = existing.label
+            provider.accounts[index] = updated
         } else {
-            accounts.append(account)
+            provider.accounts.append(CodexBarProviderAccount.fromTokenAccount(account, existingID: account.accountId))
+            if provider.activeAccountId == nil {
+                provider.activeAccountId = account.accountId
+            }
         }
-        save()
+        self.upsertProvider(provider)
+
+        let shouldSync = self.config.active.providerId == provider.id
+        self.persistIgnoringErrors(syncCodex: shouldSync)
     }
 
     func remove(_ account: TokenAccount) {
-        accounts.removeAll { $0.accountId == account.accountId }
-        save()
-    }
+        guard var provider = self.oauthProvider() else { return }
+        provider.accounts.removeAll { $0.openAIAccountId == account.accountId }
 
-    /// 将指定账号写入 ~/.codex/auth.json，激活为当前 Codex 使用账号
-    func activate(_ account: TokenAccount) throws {
-        let authDict = buildAuthJSON(account)
-        guard JSONSerialization.isValidJSONObject(authDict),
-              let data = try? JSONSerialization.data(withJSONObject: authDict, options: [.prettyPrinted, .sortedKeys]) else {
-            throw TokenStoreError.authEncodingFailed
-        }
-        do {
-            try data.write(to: authURL, options: .atomic)
-        } catch {
-            throw TokenStoreError.authWriteFailed
-        }
-        applyActiveAccount(account.accountId)
-        try persistPool()
-        objectWillChange.send()
-    }
-
-    func exportAccounts(to url: URL) throws {
-        do {
-            let data = try encodedPoolData()
-            try data.write(to: url, options: .atomic)
-        } catch {
-            throw TokenStoreError.writeFailed
-        }
-    }
-
-    func importAccounts(from url: URL) throws -> AccountImportSummary {
-        let data: Data
-        do {
-            data = try Data(contentsOf: url)
-        } catch {
-            throw TokenStoreError.readFailed
-        }
-
-        let importedPool: TokenPool
-        do {
-            importedPool = try decoder.decode(TokenPool.self, from: data)
-        } catch {
-            throw TokenStoreError.invalidFormat
-        }
-
-        var seenAccountIDs = Set(accounts.map(\.accountId))
-        var importedAccounts: [TokenAccount] = []
-        var skippedCount = 0
-
-        for account in importedPool.accounts {
-            let normalized = try normalizedImportedAccount(account)
-            guard !seenAccountIDs.contains(normalized.accountId) else {
-                skippedCount += 1
-                continue
+        if provider.accounts.isEmpty {
+            self.config.providers.removeAll { $0.id == provider.id }
+            if self.config.active.providerId == provider.id {
+                let fallback = self.config.providers.first
+                self.config.active.providerId = fallback?.id
+                self.config.active.accountId = fallback?.activeAccount?.id
             }
-            seenAccountIDs.insert(normalized.accountId)
-            importedAccounts.append(normalized)
+        } else {
+            if provider.activeAccountId == account.accountId {
+                provider.activeAccountId = provider.accounts.first?.id
+            }
+            if self.config.active.providerId == provider.id && self.config.active.accountId == account.accountId {
+                self.config.active.accountId = provider.activeAccountId
+            }
+            self.upsertProvider(provider)
         }
+        self.persistIgnoringErrors(syncCodex: self.config.active.providerId == provider.id)
+    }
 
-        guard !importedAccounts.isEmpty else {
-            throw TokenStoreError.noImportableAccounts
+    func activate(_ account: TokenAccount) throws {
+        guard var provider = self.oauthProvider(),
+              let stored = provider.accounts.first(where: { $0.openAIAccountId == account.accountId }) else {
+            throw TokenStoreError.accountNotFound
         }
-
-        let previousAccounts = accounts
-        accounts.append(contentsOf: importedAccounts)
-        applyActiveAccount(currentAuthAccountID())
-
-        do {
-            try persistPool()
-        } catch {
-            accounts = previousAccounts
-            throw TokenStoreError.writeFailed
-        }
-
-        return AccountImportSummary(importedCount: importedAccounts.count, skippedCount: skippedCount)
+        provider.activeAccountId = stored.id
+        self.upsertProvider(provider)
+        self.config.active.providerId = provider.id
+        self.config.active.accountId = stored.id
+        try self.persist(syncCodex: true)
     }
 
     func activeAccount() -> TokenAccount? {
-        accounts.first { $0.isActive }
+        self.accounts.first(where: { $0.isActive })
+    }
+
+    func markActiveAccount() {
+        self.publishState()
+    }
+
+    // MARK: - Public: Custom Provider 操作
+
+    func activateCustomProvider(providerID: String, accountID: String) throws {
+        guard var provider = self.config.providers.first(where: { $0.id == providerID && $0.kind == .openAICompatible }) else {
+            throw TokenStoreError.providerNotFound
+        }
+        guard provider.accounts.contains(where: { $0.id == accountID }) else {
+            throw TokenStoreError.accountNotFound
+        }
+        provider.activeAccountId = accountID
+        self.upsertProvider(provider)
+        self.config.active.providerId = provider.id
+        self.config.active.accountId = accountID
+        try self.persist(syncCodex: true)
+    }
+
+    func addCustomProvider(label: String, baseURL: String, accountLabel: String, apiKey: String) throws {
+        let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBaseURL = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedLabel.isEmpty, !trimmedBaseURL.isEmpty, !trimmedAPIKey.isEmpty else {
+            throw TokenStoreError.invalidInput
+        }
+
+        let providerID = self.slug(from: trimmedLabel)
+        let trimmedAccountLabel = accountLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let account = CodexBarProviderAccount(
+            kind: .apiKey,
+            label: trimmedAccountLabel.isEmpty ? "Default" : trimmedAccountLabel,
+            apiKey: trimmedAPIKey,
+            addedAt: Date()
+        )
+        let provider = CodexBarProvider(
+            id: providerID,
+            kind: .openAICompatible,
+            label: trimmedLabel,
+            enabled: true,
+            baseURL: trimmedBaseURL,
+            activeAccountId: account.id,
+            accounts: [account]
+        )
+        self.config.providers.removeAll { $0.id == provider.id }
+        self.config.providers.append(provider)
+        self.config.active.providerId = provider.id
+        self.config.active.accountId = account.id
+        try self.persist(syncCodex: true)
+    }
+
+    func addCustomProviderAccount(providerID: String, label: String, apiKey: String) throws {
+        guard var provider = self.config.providers.first(where: { $0.id == providerID && $0.kind == .openAICompatible }) else {
+            throw TokenStoreError.providerNotFound
+        }
+        let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAPIKey.isEmpty else { throw TokenStoreError.invalidInput }
+
+        let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let account = CodexBarProviderAccount(
+            kind: .apiKey,
+            label: trimmedLabel.isEmpty ? "Account \(provider.accounts.count + 1)" : trimmedLabel,
+            apiKey: trimmedAPIKey,
+            addedAt: Date()
+        )
+        provider.accounts.append(account)
+        if provider.activeAccountId == nil { provider.activeAccountId = account.id }
+        self.upsertProvider(provider)
+        try self.persist(syncCodex: false)
+    }
+
+    func removeCustomProviderAccount(providerID: String, accountID: String) throws {
+        guard var provider = self.config.providers.first(where: { $0.id == providerID && $0.kind == .openAICompatible }) else {
+            throw TokenStoreError.providerNotFound
+        }
+        provider.accounts.removeAll { $0.id == accountID }
+        if provider.accounts.isEmpty {
+            self.config.providers.removeAll { $0.id == providerID }
+            if self.config.active.providerId == providerID {
+                let fallback = self.config.providers.first
+                self.config.active.providerId = fallback?.id
+                self.config.active.accountId = fallback?.activeAccount?.id
+                try self.persist(syncCodex: fallback != nil)
+                return
+            }
+        } else {
+            if provider.activeAccountId == accountID { provider.activeAccountId = provider.accounts.first?.id }
+            if self.config.active.providerId == providerID && self.config.active.accountId == accountID {
+                self.upsertProvider(provider)
+                self.config.active.accountId = provider.activeAccountId
+                try self.persist(syncCodex: true)
+                return
+            }
+            self.upsertProvider(provider)
+        }
+        try self.persist(syncCodex: false)
+    }
+
+    func removeCustomProvider(providerID: String) throws {
+        self.config.providers.removeAll { $0.id == providerID }
+        if self.config.active.providerId == providerID {
+            let fallback = self.oauthProvider() ?? self.customProviders.first
+            self.config.active.providerId = fallback?.id
+            self.config.active.accountId = fallback?.activeAccount?.id
+            try self.persist(syncCodex: fallback != nil)
+            return
+        }
+        try self.persist(syncCodex: false)
+    }
+
+    // MARK: - Public: 批量删除
+
+    func batchRemove(oauthAccountIds: [String], compatibleItems: [(providerID: String, accountID: String)]) throws {
+        // 删除 OAuth 账号
+        if !oauthAccountIds.isEmpty, var provider = self.oauthProvider() {
+            provider.accounts.removeAll { acct in
+                guard let id = acct.openAIAccountId else { return false }
+                return oauthAccountIds.contains(id)
+            }
+            if provider.accounts.isEmpty {
+                self.config.providers.removeAll { $0.id == provider.id }
+                if self.config.active.providerId == provider.id {
+                    let fallback = self.config.providers.first
+                    self.config.active.providerId = fallback?.id
+                    self.config.active.accountId = fallback?.activeAccount?.id
+                }
+            } else {
+                if let activeId = provider.activeAccountId,
+                   !provider.accounts.contains(where: { $0.id == activeId }) {
+                    provider.activeAccountId = provider.accounts.first?.id
+                }
+                if self.config.active.providerId == provider.id,
+                   let activeAccountId = self.config.active.accountId,
+                   !provider.accounts.contains(where: { $0.id == activeAccountId }) {
+                    self.config.active.accountId = provider.activeAccountId
+                }
+                self.upsertProvider(provider)
+            }
+        }
+
+        // 删除 compatible accounts
+        for item in compatibleItems {
+            if var provider = self.config.providers.first(where: { $0.id == item.providerID }) {
+                provider.accounts.removeAll { $0.id == item.accountID }
+                if provider.accounts.isEmpty {
+                    self.config.providers.removeAll { $0.id == item.providerID }
+                    if self.config.active.providerId == item.providerID {
+                        let fallback = self.oauthProvider() ?? self.customProviders.first
+                        self.config.active.providerId = fallback?.id
+                        self.config.active.accountId = fallback?.activeAccount?.id
+                    }
+                } else {
+                    if provider.activeAccountId == item.accountID {
+                        provider.activeAccountId = provider.accounts.first?.id
+                    }
+                    if self.config.active.providerId == item.providerID && self.config.active.accountId == item.accountID {
+                        self.config.active.accountId = provider.activeAccountId
+                    }
+                    self.upsertProvider(provider)
+                }
+            }
+        }
+
+        let shouldSync = self.config.activeProvider() != nil
+        try self.persist(syncCodex: shouldSync)
     }
 
     // MARK: - Private
 
-    func markActiveAccount() {
-        applyActiveAccount(currentAuthAccountID())
-        save()
+    private func oauthProvider() -> CodexBarProvider? {
+        self.config.providers.first(where: { $0.kind == .openAIOAuth })
     }
 
-    private func encodedPoolData() throws -> Data {
-        try encoder.encode(TokenPool(accounts: accounts))
+    private func ensureOAuthProvider() -> CodexBarProvider {
+        if let provider = self.oauthProvider() { return provider }
+        let provider = CodexBarProvider(id: "openai-oauth", kind: .openAIOAuth, label: "OpenAI", enabled: true)
+        self.config.providers.append(provider)
+        return provider
     }
 
-    private func persistPool() throws {
-        let data = try encodedPoolData()
-        try data.write(to: poolURL, options: .atomic)
-    }
-
-    private func currentAuthAccountID() -> String? {
-        guard let data = try? Data(contentsOf: authURL),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tokens = json["tokens"] as? [String: Any],
-              let accountId = tokens["account_id"] as? String,
-              !accountId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
-        }
-        return accountId
-    }
-
-    private func applyActiveAccount(_ accountId: String?) {
-        for idx in accounts.indices {
-            accounts[idx].isActive = (accounts[idx].accountId == accountId)
+    private func upsertProvider(_ provider: CodexBarProvider) {
+        if let index = self.config.providers.firstIndex(where: { $0.id == provider.id }) {
+            self.config.providers[index] = provider
+        } else {
+            self.config.providers.append(provider)
         }
     }
 
-    private func normalizedImportedAccount(_ account: TokenAccount) throws -> TokenAccount {
-        let trimmedAccountID = account.accountId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedAccountID.isEmpty else {
-            throw TokenStoreError.invalidFormat
-        }
-
-        var normalized = account
-        normalized.accountId = trimmedAccountID
-        normalized.isActive = false
-        return normalized
+    private func persist(syncCodex: Bool) throws {
+        try self.configStore.save(self.config)
+        if syncCodex { try self.syncService.synchronize(config: self.config) }
+        self.publishState()
     }
 
-    private func buildAuthJSON(_ account: TokenAccount) -> [String: Any] {
-        let tokens: [String: Any] = [
-            "access_token": account.accessToken,
-            "refresh_token": account.refreshToken,
-            "id_token": account.idToken,
-            "account_id": account.accountId,
-        ]
-        return [
-            "auth_mode": "chatgpt",
-            "OPENAI_API_KEY": NSNull(),
-            "last_refresh": ISO8601DateFormatter().string(from: Date()),
-            "tokens": tokens
-        ]
+    private func persistIgnoringErrors(syncCodex: Bool) {
+        do { try self.persist(syncCodex: syncCodex) } catch { self.publishState() }
+    }
+
+    private func publishState() {
+        guard let provider = self.oauthProvider() else {
+            self.accounts = []
+            return
+        }
+        let isOAuthActive = self.config.active.providerId == provider.id
+        self.accounts = provider.accounts.compactMap { stored in
+            stored.asTokenAccount(isActive: isOAuthActive && self.config.active.accountId == stored.id)
+        }.sorted { lhs, rhs in
+            if lhs.isActive != rhs.isActive { return lhs.isActive }
+            return lhs.email < rhs.email
+        }
+    }
+
+    private func slug(from label: String) -> String {
+        let lowered = label.lowercased()
+        let s = lowered.replacingOccurrences(of: #"[^a-z0-9]+"#, with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return s.isEmpty ? "provider-\(UUID().uuidString.lowercased())" : s
     }
 }
 
 enum TokenStoreError: LocalizedError {
-    case authEncodingFailed
-    case authWriteFailed
-    case readFailed
-    case invalidFormat
-    case writeFailed
-    case noImportableAccounts
+    case accountNotFound
+    case providerNotFound
+    case invalidInput
 
     var errorDescription: String? {
         switch self {
-        case .authEncodingFailed, .authWriteFailed:
-            return "写入 auth.json 失败"
-        case .readFailed:
-            return L.backupReadFailed
-        case .invalidFormat:
-            return L.backupInvalidFormat
-        case .writeFailed:
-            return L.backupWriteFailed
-        case .noImportableAccounts:
-            return L.noImportableAccounts
+        case .accountNotFound: return "未找到账号"
+        case .providerNotFound: return "未找到 provider"
+        case .invalidInput: return "输入无效"
         }
     }
 }

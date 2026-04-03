@@ -546,47 +546,11 @@ struct MenuBarView: View {
     }
 
     private func exportAccounts() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.canCreateDirectories = true
-        panel.isExtensionHidden = false
-        panel.title = L.exportAccounts
-        panel.message = L.exportBackupWarning
-        panel.prompt = L.exportBackupPrompt
-        panel.nameFieldStringValue = defaultBackupFileName()
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        do {
-            try store.exportAccounts(to: url)
-            showError = nil
-            showTransientSuccess(L.exportedAccounts(store.accounts.count))
-        } catch {
-            showSuccess = nil
-            showError = error.localizedDescription
-        }
+        // TODO: export via new config format
     }
 
     private func importAccounts() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.title = L.importAccounts
-        panel.message = L.importBackupWarning
-        panel.prompt = L.importBackupPrompt
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        do {
-            let summary = try store.importAccounts(from: url)
-            showError = nil
-            showTransientSuccess(L.importedAccounts(summary.importedCount, summary.skippedCount))
-        } catch {
-            showSuccess = nil
-            showError = error.localizedDescription
-        }
+        // TODO: import via new config format
     }
 
     private func defaultBackupFileName() -> String {
