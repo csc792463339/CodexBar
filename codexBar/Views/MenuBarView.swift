@@ -20,16 +20,8 @@ struct MenuBarView: View {
     @State private var menuVisible = false
     @State private var languageToggle = false
 
-    // Provider management
-    @State private var showAddProviderSheet = false
-    @State private var newProviderLabel = ""
-    @State private var newProviderBaseURL = ""
-    @State private var newProviderAccountLabel = ""
-    @State private var newProviderAPIKey = ""
-    @State private var showAddAccountSheet = false
+    // Provider management — 用 NSAlert 替代 sheet 避免菜单栏失焦问题
     @State private var addAccountProviderID = ""
-    @State private var newAccountLabel = ""
-    @State private var newAccountAPIKey = ""
 
     // Batch delete
     @State private var isBatchDeleteMode = false
@@ -167,8 +159,6 @@ struct MenuBarView: View {
             }
         }
         .onDisappear { menuVisible = false }
-        .sheet(isPresented: $showAddProviderSheet) { addProviderSheet }
-        .sheet(isPresented: $showAddAccountSheet) { addAccountSheet }
     }
 
     // MARK: - Summary Card (Hero)
@@ -415,7 +405,7 @@ struct MenuBarView: View {
                                     },
                                     onAddAccount: {
                                         addAccountProviderID = provider.id
-                                        showAddAccountSheet = true
+                                        showAddAccountPanel(providerID: provider.id)
                                     },
                                     onDeleteAccount: { account in
                                         do {
@@ -552,7 +542,7 @@ struct MenuBarView: View {
                 .buttonStyle(GlassIconButtonStyle(prominent: true, tint: MenuBarTheme.accent))
 
                 Button {
-                    showAddProviderSheet = true
+                    showAddProviderPanel()
                 } label: {
                     Image(systemName: "server.rack")
                 }
@@ -657,123 +647,139 @@ struct MenuBarView: View {
         }
     }
 
-    // MARK: - Add Provider Sheet
+    // MARK: - Add Provider Panel (NSAlert-based, 避免 MenuBarExtra 失焦问题)
 
-    private var addProviderSheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("添加自定义 Provider")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(MenuBarTheme.textPrimary)
+    private func showAddProviderPanel() {
+        let alert = NSAlert()
+        alert.messageText = "添加自定义 Provider"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "添加")
+        alert.addButton(withTitle: "取消")
 
-            VStack(alignment: .leading, spacing: 8) {
-                providerField(label: "名称", placeholder: "FunAI", text: $newProviderLabel)
-                providerField(label: "Base URL", placeholder: "https://api.example.com/v1", text: $newProviderBaseURL)
-                providerField(label: "账号名称（可选）", placeholder: "Default", text: $newProviderAccountLabel)
-                providerField(label: "API Key", placeholder: "sk-...", text: $newProviderAPIKey, isSecure: true)
-            }
+        let stackView = NSStackView()
+        stackView.orientation = .vertical
+        stackView.alignment = .left
+        stackView.spacing = 8
+        stackView.frame = NSRect(x: 0, y: 0, width: 340, height: 140)
 
-            HStack {
-                Button("取消") {
-                    showAddProviderSheet = false
-                    clearAddProviderFields()
-                }
-                .buttonStyle(GlassPillButtonStyle(tint: MenuBarTheme.textTertiary))
+        let labelField = makeTextField(placeholder: "名称（如 FunAI）")
+        let urlField = makeTextField(placeholder: "Base URL（如 https://api.example.com/v1）")
+        let accountLabelField = makeTextField(placeholder: "账号名称（可选，留空用 Default）")
+        let apiKeyField = makeSecureField(placeholder: "API Key（如 sk-...）")
 
-                Spacer()
-
-                Button("添加") {
-                    do {
-                        try store.addCustomProvider(
-                            label: newProviderLabel,
-                            baseURL: newProviderBaseURL,
-                            accountLabel: newProviderAccountLabel,
-                            apiKey: newProviderAPIKey
-                        )
-                        showAddProviderSheet = false
-                        clearAddProviderFields()
-                        showTransientSuccess("已添加 \(newProviderLabel)")
-                    } catch {
-                        showError = error.localizedDescription
-                    }
-                }
-                .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.accent))
-                .disabled(newProviderLabel.trimmingCharacters(in: .whitespaces).isEmpty ||
-                          newProviderBaseURL.trimmingCharacters(in: .whitespaces).isEmpty ||
-                          newProviderAPIKey.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
+        for (label, field) in [
+            ("名称", labelField),
+            ("Base URL", urlField),
+            ("账号名称（可选）", accountLabelField),
+            ("API Key", apiKeyField),
+        ] {
+            let row = NSStackView()
+            row.orientation = .horizontal
+            row.spacing = 6
+            let lbl = NSTextField(labelWithString: label)
+            lbl.font = .systemFont(ofSize: 11)
+            lbl.textColor = .secondaryLabelColor
+            lbl.frame.size.width = 90
+            lbl.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+            row.addArrangedSubview(lbl)
+            row.addArrangedSubview(field)
+            stackView.addArrangedSubview(row)
+            row.frame.size.width = 340
         }
-        .padding(20)
-        .frame(width: 360)
-        .background(MenuBarTheme.bgSecondary)
-    }
 
-    private var addAccountSheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("添加 API Key")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(MenuBarTheme.textPrimary)
+        alert.accessoryView = stackView
+        alert.window.initialFirstResponder = labelField
+        NSApp.activate(ignoringOtherApps: true)
 
-            VStack(alignment: .leading, spacing: 8) {
-                providerField(label: "账号名称（可选）", placeholder: "Account", text: $newAccountLabel)
-                providerField(label: "API Key", placeholder: "sk-...", text: $newAccountAPIKey, isSecure: true)
-            }
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
 
-            HStack {
-                Button("取消") {
-                    showAddAccountSheet = false
-                    newAccountLabel = ""
-                    newAccountAPIKey = ""
-                }
-                .buttonStyle(GlassPillButtonStyle(tint: MenuBarTheme.textTertiary))
+        let label = labelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseURL = urlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let accountLabel = accountLabelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let apiKey = apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
-                Spacer()
-
-                Button("添加") {
-                    do {
-                        try store.addCustomProviderAccount(
-                            providerID: addAccountProviderID,
-                            label: newAccountLabel,
-                            apiKey: newAccountAPIKey
-                        )
-                        showAddAccountSheet = false
-                        newAccountLabel = ""
-                        newAccountAPIKey = ""
-                    } catch {
-                        showError = error.localizedDescription
-                    }
-                }
-                .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.accent))
-                .disabled(newAccountAPIKey.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
+        guard !label.isEmpty, !baseURL.isEmpty, !apiKey.isEmpty else {
+            showError = "名称、Base URL 和 API Key 不能为空"
+            return
         }
-        .padding(20)
-        .frame(width: 320)
-        .background(MenuBarTheme.bgSecondary)
-    }
 
-    @ViewBuilder
-    private func providerField(label: String, placeholder: String, text: Binding<String>, isSecure: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(MenuBarTheme.textTertiary)
-            if isSecure {
-                SecureField(placeholder, text: text)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
-            } else {
-                TextField(placeholder, text: text)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
-            }
+        do {
+            try store.addCustomProvider(label: label, baseURL: baseURL, accountLabel: accountLabel, apiKey: apiKey)
+            showTransientSuccess("已添加 \(label)")
+        } catch {
+            showError = error.localizedDescription
         }
     }
 
-    private func clearAddProviderFields() {
-        newProviderLabel = ""
-        newProviderBaseURL = ""
-        newProviderAccountLabel = ""
-        newProviderAPIKey = ""
+    private func showAddAccountPanel(providerID: String) {
+        let alert = NSAlert()
+        alert.messageText = "添加 API Key"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "添加")
+        alert.addButton(withTitle: "取消")
+
+        let stackView = NSStackView()
+        stackView.orientation = .vertical
+        stackView.alignment = .left
+        stackView.spacing = 8
+        stackView.frame = NSRect(x: 0, y: 0, width: 300, height: 60)
+
+        let accountLabelField = makeTextField(placeholder: "账号名称（可选）")
+        let apiKeyField = makeSecureField(placeholder: "API Key（如 sk-...）")
+
+        for (label, field) in [
+            ("账号名称", accountLabelField),
+            ("API Key", apiKeyField),
+        ] {
+            let row = NSStackView()
+            row.orientation = .horizontal
+            row.spacing = 6
+            let lbl = NSTextField(labelWithString: label)
+            lbl.font = .systemFont(ofSize: 11)
+            lbl.textColor = .secondaryLabelColor
+            lbl.frame.size.width = 70
+            lbl.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+            row.addArrangedSubview(lbl)
+            row.addArrangedSubview(field)
+            stackView.addArrangedSubview(row)
+            row.frame.size.width = 300
+        }
+
+        alert.accessoryView = stackView
+        alert.window.initialFirstResponder = accountLabelField
+        NSApp.activate(ignoringOtherApps: true)
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let accountLabel = accountLabelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let apiKey = apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !apiKey.isEmpty else {
+            showError = "API Key 不能为空"
+            return
+        }
+
+        do {
+            try store.addCustomProviderAccount(providerID: providerID, label: accountLabel, apiKey: apiKey)
+        } catch {
+            showError = error.localizedDescription
+        }
+    }
+
+    private func makeTextField(placeholder: String) -> NSTextField {
+        let field = NSTextField()
+        field.placeholderString = placeholder
+        field.font = .systemFont(ofSize: 12)
+        field.frame.size.width = 240
+        return field
+    }
+
+    private func makeSecureField(placeholder: String) -> NSSecureTextField {
+        let field = NSSecureTextField()
+        field.placeholderString = placeholder
+        field.font = .systemFont(ofSize: 12)
+        field.frame.size.width = 240
+        return field
     }
 
     private func confirmBatchDelete() {

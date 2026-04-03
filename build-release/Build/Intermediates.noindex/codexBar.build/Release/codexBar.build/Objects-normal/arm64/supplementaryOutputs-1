@@ -1,0 +1,12 @@
+{
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Models/CodexBarConfig.swift" : {
+    "abi-baseline-json" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Codex_Bar.abi.json",
+    "const-values" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary.swiftconstvalues",
+    "dependencies" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary.d",
+    "diagnostics" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary.dia",
+    "objc-header" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Codex_Bar-Swift.h",
+    "swiftdoc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Codex_Bar.swiftdoc",
+    "swiftmodule" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Codex_Bar.swiftmodule",
+    "swiftsourceinfo" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Codex_Bar.swiftsourceinfo"
+  }
+}

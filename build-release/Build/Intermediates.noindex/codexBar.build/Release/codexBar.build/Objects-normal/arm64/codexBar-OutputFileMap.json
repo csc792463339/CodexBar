@@ -1,0 +1,111 @@
+{
+  "" : {
+    "const-values" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary.swiftconstvalues",
+    "dependencies" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary.d",
+    "diagnostics" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary.dia",
+    "emit-module-dependencies" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary-emit-module.dia",
+    "pch" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBar-primary.swiftdeps"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/GeneratedAssetSymbols.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/ContentView.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/ContentView.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Localization.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Localization.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Localization.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/Localization.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Models/CodexBarConfig.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexBarConfig.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexBarConfig.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexBarConfig.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Models/TokenAccount.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/TokenAccount.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/TokenAccount.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/TokenAccount.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/AccountBuilder.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AccountBuilder.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AccountBuilder.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AccountBuilder.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/AuthSwitcher.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AuthSwitcher.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AuthSwitcher.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AuthSwitcher.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/CodexBarConfigStore.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexBarConfigStore.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexBarConfigStore.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexBarConfigStore.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/CodexPaths.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexPaths.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexPaths.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexPaths.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/CodexSyncService.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexSyncService.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexSyncService.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CodexSyncService.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/GlobalHotKeyManager.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/GlobalHotKeyManager.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/GlobalHotKeyManager.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/GlobalHotKeyManager.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/OAuthManager.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/OAuthManager.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/OAuthManager.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/OAuthManager.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/TokenStore.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/TokenStore.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/TokenStore.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/TokenStore.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Services/WhamService.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/WhamService.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/WhamService.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/WhamService.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Views/AccountRowView.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AccountRowView.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AccountRowView.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/AccountRowView.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Views/CompatibleProviderRowView.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CompatibleProviderRowView.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CompatibleProviderRowView.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/CompatibleProviderRowView.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Views/MenuBarTheme.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/MenuBarTheme.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/MenuBarTheme.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/MenuBarTheme.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Views/MenuBarView.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/MenuBarView.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/MenuBarView.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/MenuBarView.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/Views/ThemePreview.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/ThemePreview.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/ThemePreview.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/ThemePreview.o"
+  },
+  "/Users/csc/IdeaProjects/CodexBar/codexBar/codexBarApp.swift" : {
+    "index-unit-output-path" : "/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBarApp.o",
+    "llvm-bc" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBarApp.bc",
+    "object" : "/Users/csc/IdeaProjects/CodexBar/build-release/Build/Intermediates.noindex/codexBar.build/Release/codexBar.build/Objects-normal/arm64/codexBarApp.o"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "source": "/Users/csc/IdeaProjects/CodexBar/codexBar/Views/AccountRowView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "#%@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 77
+        }
+      }
+    ]
+  },
+  "version": 1
+}

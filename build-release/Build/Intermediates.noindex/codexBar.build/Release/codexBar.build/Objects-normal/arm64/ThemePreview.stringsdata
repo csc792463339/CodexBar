@@ -1,0 +1,88 @@
+{
+  "source": "/Users/csc/IdeaProjects/CodexBar/codexBar/Views/ThemePreview.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "CODEX BAR",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 18
+        }
+      },
+      {
+        "comment": "",
+        "key": "My Organization",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "SECURED",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 43
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account switched",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 126
+        }
+      },
+      {
+        "comment": "",
+        "key": "Just updated",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "EN",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 206
+        }
+      },
+      {
+        "comment": "",
+        "key": "Switch",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 276
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quota exhausted - resets in 2h 15m",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 300
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reauth",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 313
+        }
+      }
+    ]
+  },
+  "version": 1
+}
