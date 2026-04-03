@@ -20,6 +20,22 @@ struct MenuBarView: View {
     @State private var menuVisible = false
     @State private var languageToggle = false
 
+    // Provider management
+    @State private var showAddProviderSheet = false
+    @State private var newProviderLabel = ""
+    @State private var newProviderBaseURL = ""
+    @State private var newProviderAccountLabel = ""
+    @State private var newProviderAPIKey = ""
+    @State private var showAddAccountSheet = false
+    @State private var addAccountProviderID = ""
+    @State private var newAccountLabel = ""
+    @State private var newAccountAPIKey = ""
+
+    // Batch delete
+    @State private var isBatchDeleteMode = false
+    @State private var selectedOAuthAccountIds: Set<String> = []
+    @State private var selectedCompatibleItems: Set<String> = []
+
     // MARK: - Data
 
     private var groupedAccounts: [(email: String, accounts: [TokenAccount])] {
@@ -151,6 +167,8 @@ struct MenuBarView: View {
             }
         }
         .onDisappear { menuVisible = false }
+        .sheet(isPresented: $showAddProviderSheet) { addProviderSheet }
+        .sheet(isPresented: $showAddAccountSheet) { addAccountSheet }
     }
 
     // MARK: - Summary Card (Hero)
@@ -356,27 +374,148 @@ struct MenuBarView: View {
     private var accountsList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: MenuBarTheme.groupSpacing) {
+                // Compatible Providers 区域
+                if !store.customProviders.isEmpty {
+                    VStack(alignment: .leading, spacing: MenuBarTheme.titleContentSpacing) {
+                        Text("Custom Providers")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(MenuBarTheme.textTertiary)
+                            .tracking(1)
+
+                        VStack(spacing: MenuBarTheme.cardSpacing) {
+                            ForEach(store.customProviders) { provider in
+                                CompatibleProviderRowView(
+                                    provider: provider,
+                                    isActiveProvider: store.config.active.providerId == provider.id,
+                                    activeAccountId: store.config.active.providerId == provider.id
+                                        ? store.config.active.accountId : nil,
+                                    isBatchMode: isBatchDeleteMode,
+                                    selectedItemIds: Set(selectedCompatibleItems.compactMap { item -> String? in
+                                        let parts = item.components(separatedBy: "::")
+                                        guard parts.count == 2, parts[0] == provider.id else { return nil }
+                                        return parts[1]
+                                    }),
+                                    onToggleSelection: { account in
+                                        let key = "\(provider.id)::\(account.id)"
+                                        if selectedCompatibleItems.contains(key) {
+                                            selectedCompatibleItems.remove(key)
+                                        } else {
+                                            selectedCompatibleItems.insert(key)
+                                        }
+                                    },
+                                    onActivate: { account in
+                                        do {
+                                            try store.activateCustomProvider(providerID: provider.id, accountID: account.id)
+                                            showError = nil
+                                            showTransientSuccess("已切换到 \(provider.label)")
+                                            handleCodexRestart()
+                                        } catch {
+                                            showError = error.localizedDescription
+                                        }
+                                    },
+                                    onAddAccount: {
+                                        addAccountProviderID = provider.id
+                                        showAddAccountSheet = true
+                                    },
+                                    onDeleteAccount: { account in
+                                        do {
+                                            try store.removeCustomProviderAccount(providerID: provider.id, accountID: account.id)
+                                        } catch {
+                                            showError = error.localizedDescription
+                                        }
+                                    },
+                                    onDeleteProvider: {
+                                        let alert = NSAlert()
+                                        alert.messageText = "删除 \(provider.label)？"
+                                        alert.alertStyle = .warning
+                                        alert.addButton(withTitle: "删除")
+                                        alert.addButton(withTitle: "取消")
+                                        if alert.runModal() == .alertFirstButtonReturn {
+                                            do {
+                                                try store.removeCustomProvider(providerID: provider.id)
+                                            } catch {
+                                                showError = error.localizedDescription
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // OAuth 区域 header
+                if !store.customProviders.isEmpty && !store.accounts.isEmpty {
+                    Text("OpenAI OAuth")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(MenuBarTheme.textTertiary)
+                        .tracking(1)
+                }
+
                 ForEach(groupedAccounts, id: \.email) { group in
                     VStack(alignment: .leading, spacing: MenuBarTheme.titleContentSpacing) {
                         groupHeader(for: group)
 
                         VStack(spacing: MenuBarTheme.cardSpacing) {
                             ForEach(group.accounts) { account in
-                                AccountRowView(
-                                    account: account,
-                                    isActive: account.isActive,
-                                    now: now,
-                                    isRefreshing: refreshingAccounts.contains(account.id)
-                                ) {
-                                    activateAccount(account)
-                                } onRefresh: {
-                                    Task { await refreshAccount(account); showTransientSuccess(L.refreshDone) }
-                                } onReauth: {
-                                    reauthAccount(account)
-                                } onDelete: {
-                                    store.remove(account)
+                                HStack(spacing: 8) {
+                                    if isBatchDeleteMode {
+                                        let isSelected = selectedOAuthAccountIds.contains(account.accountId)
+                                        Button {
+                                            if isSelected {
+                                                selectedOAuthAccountIds.remove(account.accountId)
+                                            } else {
+                                                selectedOAuthAccountIds.insert(account.accountId)
+                                            }
+                                        } label: {
+                                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                                .font(.system(size: 16))
+                                                .foregroundStyle(isSelected ? MenuBarTheme.error : MenuBarTheme.textTertiary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                    AccountRowView(
+                                        account: account,
+                                        isActive: account.isActive,
+                                        now: now,
+                                        isRefreshing: refreshingAccounts.contains(account.id)
+                                    ) {
+                                        if !isBatchDeleteMode { activateAccount(account) }
+                                    } onRefresh: {
+                                        if !isBatchDeleteMode { Task { await refreshAccount(account); showTransientSuccess(L.refreshDone) } }
+                                    } onReauth: {
+                                        if !isBatchDeleteMode { reauthAccount(account) }
+                                    } onDelete: {
+                                        if !isBatchDeleteMode { store.remove(account) }
+                                    }
                                 }
                             }
+                        }
+                    }
+                }
+
+                // 批量删除确认栏
+                if isBatchDeleteMode {
+                    let totalSelected = selectedOAuthAccountIds.count + selectedCompatibleItems.count
+                    HStack(spacing: 8) {
+                        Text("已选 \(totalSelected) 个")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(MenuBarTheme.textSecondary)
+                        Spacer()
+                        Button("删除选中 (\(totalSelected))") {
+                            confirmBatchDelete()
+                        }
+                        .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.error))
+                        .disabled(totalSelected == 0)
+                    }
+                    .padding(.horizontal, MenuBarTheme.cardPadding)
+                    .padding(.vertical, 8)
+                    .background {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: MenuBarTheme.cardRadius, style: .continuous)
+                                .fill(MenuBarTheme.error.opacity(0.08))
+                            RoundedRectangle(cornerRadius: MenuBarTheme.cardRadius, style: .continuous)
+                                .strokeBorder(MenuBarTheme.error.opacity(0.2), lineWidth: 0.5)
                         }
                     }
                 }
@@ -412,18 +551,25 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(GlassIconButtonStyle(prominent: true, tint: MenuBarTheme.accent))
 
-                Button(action: exportAccounts) {
-                    Image(systemName: "square.and.arrow.up")
+                Button {
+                    showAddProviderSheet = true
+                } label: {
+                    Image(systemName: "server.rack")
                 }
-                .buttonStyle(GlassIconButtonStyle(tint: MenuBarTheme.info))
-                .help(L.exportAccountsHelp)
-                .disabled(store.accounts.isEmpty)
+                .buttonStyle(GlassIconButtonStyle(prominent: true, tint: MenuBarTheme.info))
+                .help("添加自定义 Provider")
 
-                Button(action: importAccounts) {
-                    Image(systemName: "square.and.arrow.down")
+                Button {
+                    isBatchDeleteMode.toggle()
+                    if !isBatchDeleteMode {
+                        selectedOAuthAccountIds.removeAll()
+                        selectedCompatibleItems.removeAll()
+                    }
+                } label: {
+                    Image(systemName: isBatchDeleteMode ? "xmark.circle" : "trash.slash")
                 }
-                .buttonStyle(GlassIconButtonStyle(tint: MenuBarTheme.success))
-                .help(L.importAccountsHelp)
+                .buttonStyle(GlassIconButtonStyle(tint: isBatchDeleteMode ? MenuBarTheme.warning : MenuBarTheme.error))
+                .help(isBatchDeleteMode ? "取消批量删除" : "批量删除")
 
                 Button(action: toggleLanguage) {
                     Label(languageLabel, systemImage: "globe")
@@ -511,9 +657,189 @@ struct MenuBarView: View {
         }
     }
 
+    // MARK: - Add Provider Sheet
+
+    private var addProviderSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("添加自定义 Provider")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(MenuBarTheme.textPrimary)
+
+            VStack(alignment: .leading, spacing: 8) {
+                providerField(label: "名称", placeholder: "FunAI", text: $newProviderLabel)
+                providerField(label: "Base URL", placeholder: "https://api.example.com/v1", text: $newProviderBaseURL)
+                providerField(label: "账号名称（可选）", placeholder: "Default", text: $newProviderAccountLabel)
+                providerField(label: "API Key", placeholder: "sk-...", text: $newProviderAPIKey, isSecure: true)
+            }
+
+            HStack {
+                Button("取消") {
+                    showAddProviderSheet = false
+                    clearAddProviderFields()
+                }
+                .buttonStyle(GlassPillButtonStyle(tint: MenuBarTheme.textTertiary))
+
+                Spacer()
+
+                Button("添加") {
+                    do {
+                        try store.addCustomProvider(
+                            label: newProviderLabel,
+                            baseURL: newProviderBaseURL,
+                            accountLabel: newProviderAccountLabel,
+                            apiKey: newProviderAPIKey
+                        )
+                        showAddProviderSheet = false
+                        clearAddProviderFields()
+                        showTransientSuccess("已添加 \(newProviderLabel)")
+                    } catch {
+                        showError = error.localizedDescription
+                    }
+                }
+                .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.accent))
+                .disabled(newProviderLabel.trimmingCharacters(in: .whitespaces).isEmpty ||
+                          newProviderBaseURL.trimmingCharacters(in: .whitespaces).isEmpty ||
+                          newProviderAPIKey.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 360)
+        .background(MenuBarTheme.bgSecondary)
+    }
+
+    private var addAccountSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("添加 API Key")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(MenuBarTheme.textPrimary)
+
+            VStack(alignment: .leading, spacing: 8) {
+                providerField(label: "账号名称（可选）", placeholder: "Account", text: $newAccountLabel)
+                providerField(label: "API Key", placeholder: "sk-...", text: $newAccountAPIKey, isSecure: true)
+            }
+
+            HStack {
+                Button("取消") {
+                    showAddAccountSheet = false
+                    newAccountLabel = ""
+                    newAccountAPIKey = ""
+                }
+                .buttonStyle(GlassPillButtonStyle(tint: MenuBarTheme.textTertiary))
+
+                Spacer()
+
+                Button("添加") {
+                    do {
+                        try store.addCustomProviderAccount(
+                            providerID: addAccountProviderID,
+                            label: newAccountLabel,
+                            apiKey: newAccountAPIKey
+                        )
+                        showAddAccountSheet = false
+                        newAccountLabel = ""
+                        newAccountAPIKey = ""
+                    } catch {
+                        showError = error.localizedDescription
+                    }
+                }
+                .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.accent))
+                .disabled(newAccountAPIKey.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 320)
+        .background(MenuBarTheme.bgSecondary)
+    }
+
+    @ViewBuilder
+    private func providerField(label: String, placeholder: String, text: Binding<String>, isSecure: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(MenuBarTheme.textTertiary)
+            if isSecure {
+                SecureField(placeholder, text: text)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+            } else {
+                TextField(placeholder, text: text)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+            }
+        }
+    }
+
+    private func clearAddProviderFields() {
+        newProviderLabel = ""
+        newProviderBaseURL = ""
+        newProviderAccountLabel = ""
+        newProviderAPIKey = ""
+    }
+
+    private func confirmBatchDelete() {
+        let oauthIds = Array(selectedOAuthAccountIds)
+        let compatibleItems = selectedCompatibleItems.compactMap { item -> (providerID: String, accountID: String)? in
+            let parts = item.components(separatedBy: "::")
+            guard parts.count == 2 else { return nil }
+            return (providerID: parts[0], accountID: parts[1])
+        }
+        let total = oauthIds.count + compatibleItems.count
+
+        let deletingActive = oauthIds.contains(store.activeAccount()?.accountId ?? "") ||
+            compatibleItems.contains(where: {
+                $0.providerID == store.config.active.providerId &&
+                $0.accountID == store.config.active.accountId
+            })
+
+        let alert = NSAlert()
+        alert.messageText = "删除 \(total) 个账号？"
+        alert.informativeText = deletingActive
+            ? "其中包含当前激活的账号，删除后将自动切换到其他账号。此操作不可撤销。"
+            : "此操作不可撤销。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "删除")
+        alert.addButton(withTitle: "取消")
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        do {
+            try store.batchRemove(oauthAccountIds: oauthIds, compatibleItems: compatibleItems)
+            isBatchDeleteMode = false
+            selectedOAuthAccountIds.removeAll()
+            selectedCompatibleItems.removeAll()
+            showTransientSuccess("已删除 \(total) 个账号")
+        } catch {
+            showError = error.localizedDescription
+        }
+    }
+
+    private func handleCodexRestart() {
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex")
+            .filter { !$0.isTerminated }
+        guard !running.isEmpty else { showTransientSuccess(L.switchAppliedNextLaunch); return }
+        let alert = NSAlert()
+        alert.messageText = L.restartCodexTitle
+        alert.informativeText = L.restartCodexInfo
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: L.forceQuitAndReopen)
+        alert.addButton(withTitle: L.forceQuitOnly)
+        alert.addButton(withTitle: L.restartLater)
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: forceQuitCodex(running, reopen: true); showTransientSuccess(L.switchAppliedAfterReopen)
+        case .alertSecondButtonReturn: forceQuitCodex(running, reopen: false); showTransientSuccess(L.switchAppliedAfterQuit)
+        default: showTransientSuccess(L.switchAppliedNextLaunch)
+        }
+    }
+
     // MARK: - Helpers
 
     private var summaryTitle: String {
+        if let provider = store.activeProvider, provider.kind == .openAICompatible {
+            if let account = store.activeProviderAccount {
+                return "\(provider.label) · \(account.label)"
+            }
+            return provider.label
+        }
         if let activeAccount { return activeAccount.email }
         return store.accounts.isEmpty ? L.noAccounts : L.noActiveAccount
     }
@@ -572,20 +898,7 @@ struct MenuBarView: View {
         do {
             try store.activate(account)
             showError = nil
-            let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").filter { !$0.isTerminated }
-            guard !running.isEmpty else { showTransientSuccess(L.switchAppliedNextLaunch); return }
-            let alert = NSAlert()
-            alert.messageText = L.restartCodexTitle
-            alert.informativeText = L.restartCodexInfo
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: L.forceQuitAndReopen)
-            alert.addButton(withTitle: L.forceQuitOnly)
-            alert.addButton(withTitle: L.restartLater)
-            switch alert.runModal() {
-            case .alertFirstButtonReturn: forceQuitCodex(running, reopen: true); showTransientSuccess(L.switchAppliedAfterReopen)
-            case .alertSecondButtonReturn: forceQuitCodex(running, reopen: false); showTransientSuccess(L.switchAppliedAfterQuit)
-            default: showTransientSuccess(L.switchAppliedNextLaunch)
-            }
+            handleCodexRestart()
         } catch {
             showSuccess = nil; showError = error.localizedDescription
         }
