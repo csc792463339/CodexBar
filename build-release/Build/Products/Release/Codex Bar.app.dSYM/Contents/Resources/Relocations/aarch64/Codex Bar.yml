@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     '/Users/csc/IdeaProjects/CodexBar/build-release/Build/Products/Release/Codex Bar.app/Contents/MacOS/Codex Bar'
-relocations:     []
-...
