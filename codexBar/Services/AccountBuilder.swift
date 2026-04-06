@@ -1,39 +1,30 @@
 import Foundation
 
-/// 从 OAuth tokens 解析账号信息，构建 TokenAccount
+/// 从 OAuth tokens 解析账号信息，构建 CodexBarProviderAccount
 struct AccountBuilder {
-    static func build(from tokens: OAuthTokens) -> TokenAccount {
+    static func build(from tokens: OAuthTokens) -> CodexBarProviderAccount {
         let claims = decodeJWT(tokens.accessToken)
         let authClaims = claims["https://api.openai.com/auth"] as? [String: Any] ?? [:]
 
-        let accountId = authClaims["chatgpt_account_id"] as? String ?? ""
+        let orgAccountId = authClaims["chatgpt_account_id"] as? String ?? ""
         let planType = authClaims["chatgpt_plan_type"] as? String ?? "free"
 
-        // 从 id_token 取 email
         let idClaims = decodeJWT(tokens.idToken)
         let email = idClaims["email"] as? String ?? ""
+        // sub 是个人用户级唯一 ID，chatgpt_account_id 是 org 级 ID（同 org 下相同）
+        let sub = idClaims["sub"] as? String ?? orgAccountId
 
-        // 订阅到期时间（从 id_token 的 auth claim 取）
-        let idAuthClaims = idClaims["https://api.openai.com/auth"] as? [String: Any] ?? [:]
-        var expiresAt: Date? = nil
-        if let untilStr = idAuthClaims["chatgpt_subscription_active_until"] as? String {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            expiresAt = formatter.date(from: untilStr)
-                ?? ISO8601DateFormatter().date(from: untilStr)
-        }
-
-        // access_token 自身过期
-        let tokenExp = claims["exp"] as? Double
-        let tokenExpiresAt = tokenExp.map { Date(timeIntervalSince1970: $0) }
-
-        return TokenAccount(
+        return CodexBarProviderAccount(
+            id: sub,
+            kind: .oauthTokens,
+            label: email.isEmpty ? String(sub.prefix(8)) : email,
             email: email,
-            accountId: accountId,
+            openAIAccountId: orgAccountId,
             accessToken: tokens.accessToken,
             refreshToken: tokens.refreshToken,
             idToken: tokens.idToken,
-            expiresAt: expiresAt ?? tokenExpiresAt,
+            lastRefresh: Date(),
+            addedAt: Date(),
             planType: planType
         )
     }
