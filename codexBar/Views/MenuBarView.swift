@@ -15,10 +15,8 @@ struct MenuBarView: View {
     @State private var refreshingAccounts: Set<String> = []
 
     private let countdownTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
-    private let quickTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
-    private let slowTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    private let quickTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
     @State private var menuVisible = false
-    @State private var languageToggle = false
 
     // Provider management — 用 NSAlert 替代 sheet 避免菜单栏失焦问题
     @State private var addAccountProviderID = ""
@@ -79,14 +77,6 @@ struct MenuBarView: View {
         store.accounts.compactMap { $0.lastChecked }.max()
     }
 
-    private var languageLabel: String {
-        switch L.languageOverride {
-        case nil: return "AUTO"
-        case true: return "中"
-        case false: return "EN"
-        }
-    }
-
     // MARK: - Body
 
     var body: some View {
@@ -126,13 +116,10 @@ struct MenuBarView: View {
         .frame(width: MenuBarTheme.panelWidth, height: max(500, min(CGFloat(store.accounts.count) * 130 + 220, 900)))
         .onReceive(countdownTimer) { _ in now = Date() }
         .onReceive(quickTimer) { _ in
-            guard menuVisible, let active = store.accounts.first(where: { $0.isActive }), !active.secondaryExhausted else { return }
-            Task { await refreshAccount(active) }
-        }
-        .onReceive(slowTimer) { _ in
-            guard !menuVisible else { return }
-            Task {
-                await refresh()
+            if menuVisible {
+                guard let active = store.accounts.first(where: { $0.isActive }), !active.secondaryExhausted else { return }
+                Task { await refreshAccount(active) }
+            } else {
                 store.markActiveAccount()
                 autoSwitchIfNeeded()
             }
@@ -493,7 +480,9 @@ struct MenuBarView: View {
                             .foregroundStyle(MenuBarTheme.textSecondary)
                         Spacer()
                         Button("删除选中 (\(totalSelected))") {
-                            confirmBatchDelete()
+                            DispatchQueue.main.async {
+                                confirmBatchDelete()
+                            }
                         }
                         .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.error))
                         .disabled(totalSelected == 0)
@@ -549,6 +538,19 @@ struct MenuBarView: View {
                 .buttonStyle(GlassIconButtonStyle(prominent: true, tint: MenuBarTheme.info))
                 .help("添加自定义 Provider")
 
+                Button(action: exportAccounts) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(GlassIconButtonStyle(tint: MenuBarTheme.info))
+                .help(L.exportAccountsHelp)
+                .disabled(store.accounts.isEmpty)
+
+                Button(action: importAccounts) {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .buttonStyle(GlassIconButtonStyle(tint: MenuBarTheme.success))
+                .help(L.importAccountsHelp)
+
                 Button {
                     isBatchDeleteMode.toggle()
                     if !isBatchDeleteMode {
@@ -560,13 +562,6 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(GlassIconButtonStyle(tint: isBatchDeleteMode ? MenuBarTheme.warning : MenuBarTheme.error))
                 .help(isBatchDeleteMode ? "取消批量删除" : "批量删除")
-
-                Button(action: toggleLanguage) {
-                    Label(languageLabel, systemImage: "globe")
-                        .labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(GlassPillButtonStyle(prominent: true, tint: MenuBarTheme.info))
-                .help(L.toggleLanguageHelp)
 
                 Button { NSApplication.shared.terminate(nil) } label: {
                     Image(systemName: "power")
@@ -806,6 +801,7 @@ struct MenuBarView: View {
         alert.addButton(withTitle: "删除")
         alert.addButton(withTitle: "取消")
 
+        NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         do {
@@ -868,21 +864,48 @@ struct MenuBarView: View {
         }
     }
 
-    private func toggleLanguage() {
-        switch L.languageOverride {
-        case nil: L.languageOverride = true
-        case true: L.languageOverride = false
-        case false: L.languageOverride = nil
-        }
-        languageToggle.toggle()
-    }
-
     private func exportAccounts() {
-        // TODO: export via new config format
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.title = L.exportAccounts
+        panel.message = L.exportBackupWarning
+        panel.prompt = L.exportBackupPrompt
+        panel.nameFieldStringValue = defaultBackupFileName()
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try store.exportAccounts(to: url)
+            showError = nil
+            showTransientSuccess(L.exportedAccounts(store.accounts.count))
+        } catch {
+            showSuccess = nil
+            showError = error.localizedDescription
+        }
     }
 
     private func importAccounts() {
-        // TODO: import via new config format
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.title = L.importAccounts
+        panel.message = L.importBackupWarning
+        panel.prompt = L.importBackupPrompt
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let summary = try store.importAccounts(from: url)
+            showError = nil
+            showTransientSuccess(L.importedAccounts(summary.importedCount, summary.skippedCount))
+        } catch {
+            showSuccess = nil
+            showError = error.localizedDescription
+        }
     }
 
     private func defaultBackupFileName() -> String {
@@ -971,8 +994,8 @@ struct MenuBarView: View {
         running.forEach { $0.forceTerminate() }
     }
 
-    private func refresh() async { isRefreshing = true; await WhamService.shared.refreshAll(store: store); isRefreshing = false }
-    private func refreshAccount(_ account: TokenAccount) async { refreshingAccounts.insert(account.id); await WhamService.shared.refreshOne(account: account, store: store); refreshingAccounts.remove(account.id) }
+    @MainActor private func refresh() async { isRefreshing = true; await WhamService.shared.refreshAll(store: store); isRefreshing = false }
+    @MainActor private func refreshAccount(_ account: TokenAccount) async { refreshingAccounts.insert(account.id); await WhamService.shared.refreshOne(account: account, store: store); refreshingAccounts.remove(account.id) }
     private func reauthAccount(_ account: TokenAccount) {
         oauth.startOAuth { result in
             switch result {
